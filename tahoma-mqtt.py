@@ -9,6 +9,16 @@ import datetime
 import requests
 from pprint import pprint
 from slugify import slugify
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
+
+retry_strategy = Retry(
+    total=5,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET", "POST"]
+)
+
+adapter = HTTPAdapter(max_retries=retry_strategy)
 
 FORMAT = ('%(asctime)-15s %(threadName)-15s '
           '%(levelname)-8s %(module)-15s:%(lineno)-8s %(message)s')
@@ -30,21 +40,35 @@ tahoma_listener = None
 
 def tahoma_connect():
     global tahoma_user, tahoma_pass, tahoma_session, tahoma_address
+    global adapter
     tahoma_session = requests.Session()
+    tahoma_session.mount("https://", adapter)
+    tahoma_session.mount("http://", adapter)
     r = tahoma_session.post(tahoma_address + '/enduser-mobile-web/enduserAPI/login', [('userId', tahoma_user), ('userPassword', tahoma_pass)])
     response = r.json()
     return response['success']
 
 def tahoma_devicelist():
     global tahoma_session, tahoma_address
-    r = tahoma_session.get(tahoma_address + '/enduser-mobile-web/enduserAPI/setup/devices')
-    # TODO add response validation, reconnect, retry
+    try:
+        r = tahoma_session.get(tahoma_address + '/enduser-mobile-web/enduserAPI/setup/devices')
+        # TODO add response validation
+    except:
+        #reconnect
+        tahoma_connect()
+        #retry
+        r = tahoma_session.get(tahoma_address + '/enduser-mobile-web/enduserAPI/setup/devices')
     return r.json()
 
 def tahoma_events():
     global tahoma_session, tahoma_address, tahoma_listener
-    r = tahoma_session.post(tahoma_address + '/enduser-mobile-web/enduserAPI/events/' + tahoma_listener + '/fetch')
-    # TODO add response validation, reconnect, retry
+    try:
+        r = tahoma_session.post(tahoma_address + '/enduser-mobile-web/enduserAPI/events/' + tahoma_listener + '/fetch')
+        # TODO add response validation, reconnect, retry
+    except:
+        tahoma_connect()
+        r = tahoma_session.post(tahoma_address + '/enduser-mobile-web/enduserAPI/events/' + tahoma_listener + '/fetch')
+
     return r.json()
 
 def tahoma_register_listener():
@@ -70,8 +94,12 @@ def prepare_command(device, commands):
 
 def tahoma_exec(data):
     global tahoma_session, tahoma_address
-    r = tahoma_session.post(tahoma_address + '/enduser-mobile-web/enduserAPI/exec/apply', json=data)
-    # TODO add response validation, reconnect, retry
+    try:
+        r = tahoma_session.post(tahoma_address + '/enduser-mobile-web/enduserAPI/exec/apply', json=data)
+        # TODO add response validation, reconnect, retry
+    except:
+        tahoma_connect()
+        r = tahoma_session.post(tahoma_address + '/enduser-mobile-web/enduserAPI/exec/apply', json=data)
     return r.json()
 
 def exit_gracefully(signum, frame):
@@ -196,7 +224,7 @@ while True and not mqttclient.bad_connection_flag and not kill_me_now:
                     mqttclient.publish("tahoma/" + tahoma_topic + "/" + slugify(event['deviceURL']) + "/status" , json.dumps(event['deviceStates']), qos=0, retain=True)
 
 
-    time.sleep(10)
+    time.sleep(5)
 
 print("Stopping loop")
 mqttclient.loop_stop()
