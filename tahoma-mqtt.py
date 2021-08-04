@@ -206,10 +206,12 @@ except:
 
 #mqttclient.subscribe("ngbs/#", qos=0)
 
+reconnect_counter = 0
 while True and not mqttclient.bad_connection_flag and not kill_me_now:
     # poll device status
-    if (not tahoma_session) and tahoma_user and tahoma_pass:
+    if reconnect_counter <= 0 and (not tahoma_session) and tahoma_user and tahoma_pass:
         tahoma_connect()
+        reconnect_counter = 12
             
     if tahoma_session and tahoma_listener:
         events = tahoma_events()
@@ -225,6 +227,7 @@ while True and not mqttclient.bad_connection_flag and not kill_me_now:
 
 
     time.sleep(5)
+    reconnect_counter -= 1
 
 print("Stopping loop")
 mqttclient.loop_stop()
