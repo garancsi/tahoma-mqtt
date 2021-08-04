@@ -220,10 +220,9 @@ while True and not mqttclient.bad_connection_flag and not kill_me_now:
             if event['name'] == 'DeviceStateChangedEvent':
                 pprint(json.dumps(event['deviceStates']))
                 if any(s['name'] == "core:SlateOrientationState" for s in event['deviceStates']):
-                    # it a tilt so publish it to tilt device 
+                    # it a tilt so publish it to tilt device also
                     mqttclient.publish("tahoma/" + tahoma_topic + "/" + slugify(event['deviceURL'] + "_Tilt") + "/status" , json.dumps(event['deviceStates']), qos=0, retain=True)
-                else:
-                    mqttclient.publish("tahoma/" + tahoma_topic + "/" + slugify(event['deviceURL']) + "/status" , json.dumps(event['deviceStates']), qos=0, retain=True)
+                mqttclient.publish("tahoma/" + tahoma_topic + "/" + slugify(event['deviceURL']) + "/status" , json.dumps(event['deviceStates']), qos=0, retain=True)
 
 
     time.sleep(5)
